@@ -24,6 +24,7 @@ var (
 // How much stack space to allocate for unescaping JSON strings; if a string longer
 // than this needs to be escaped, it will result in a heap allocation
 const unescapeStackBufSize = 64
+const allPattern = "[*]"
 
 func tokenEnd(data []byte) int {
 	for i, c := range data {
@@ -527,12 +528,14 @@ func EachKey(data []byte, cb func(int, []byte, ValueType, error), paths ...[]str
 
 				var curIdx int
 				arrOff, _ := ArrayEach(data[i:], func(value []byte, dataType ValueType, offset int, err error) {
+					captureAll := false
 					if _, ok = arrIdxFlags[curIdx]; ok {
 						for pi, p := range paths {
 							if pIdxFlags[pi] {
+								captureAll = p[level-1] == allPattern
 								aIdx, _ := strconv.Atoi(p[level-1][1 : len(p[level-1])-1])
 
-								if curIdx == aIdx {
+								if curIdx == aIdx || captureAll {
 									of := searchKeys(value, p[level:]...)
 
 									pathsMatched++
@@ -548,6 +551,9 @@ func EachKey(data []byte, cb func(int, []byte, ValueType, error), paths ...[]str
 					}
 
 					curIdx += 1
+					if captureAll {
+						arrIdxFlags[curIdx] = x
+					}
 				})
 
 				if pathsMatched == len(paths) {
